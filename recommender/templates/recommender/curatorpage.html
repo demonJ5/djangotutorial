@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %} Music Curator{% endblock %}
+
+{% block content %}
+<form method='post' action="/recommender/curatorp/">
+    {% csrf_token %}
+    <br>
+    <center>
+        <h2>Music Curator</h2>
+    </center>
+    <br>
+    <div>
+        Song Title: {{ form.artist }}
+    </div>
+    <br>
+
+    <button class="btn btn-primary btn-lg" type="submit">Submit</button>
+
+</form>
+<br>
+
+{% if tracks %}
+<table class="table">
+<tbody>
+<tr>
+
+
+{% for track in tracks %}
+
+<td>
+<iframe src="https://open.spotify.com/embed/track/{{ track.id }}" width="300" height="380" 
+frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>
+</td>
+
+{% endfor %}
+
+</tr>
+</tbody>
+</table>
+
+{% endif %}
+
+{% endblock %}

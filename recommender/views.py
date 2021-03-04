@@ -43,3 +43,13 @@ def searchform_get(request):
     form = SearchForm()
     return render(request, 'recommender/searchform.html', {'form': form})
 
+@require_POST
+def curator_post(request):
+    #form = SearchForm(request.POST)
+    form = SearchForm()
+    return render(request, 'recommender/curatorpage.html', {'form': form})
+
+@require_GET
+def curator_get(request):
+    form = SearchForm()
+    return render(request, 'recommender/curatorpage.html', {'form': form})
