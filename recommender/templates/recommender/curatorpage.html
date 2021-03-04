@@ -3,7 +3,28 @@
 {% block title %} Music Curator{% endblock %}
 
 {% block content %}
+    <!-- begin bootstrap -->
+        <nav class="navbar navbar-expand-lg navbar-light bg-light">
+          <div class="container-fluid">
+            <a class="navbar-brand" href="#">Test App</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+              <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarSupportedContent">
+              <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item">
+                  <a class="nav-link active" aria-current="page" href="#">Curator</a>
+                </li>
+                <li class="nav-item">
+                  <a class="nav-link active" href="/recommender/best/">Original</a>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </nav>
+    <!-- end bootstrap -->
 <form method='post' action="/recommender/curatorp/">
+<div>
     {% csrf_token %}
     <br>
     <center>
@@ -11,12 +32,63 @@
     </center>
     <br>
     <div>
-        Song Title: {{ form.artist }}
+        Initial Song Title: {{ form.id_title }}
     </div>
     <br>
-
-    <button class="btn btn-primary btn-lg" type="submit">Submit</button>
-
+    <div>
+        <table style="float:left">
+            <tr>
+                <td>Acoustiness Weight</td>
+                <td>{{ form.id_acousticness_weight }}</td>
+            </tr>
+            <tr>
+                <td>Danceability Weight</td>
+                <td>{{ form.id_danceability_weight }}</td>
+            </tr>
+            <tr>
+                <td>Energy Weight</td>
+                <td>{{ form.id_energy_weight}}</td>
+            </tr>
+            <tr>
+                <td>Instrumental Weight</td>
+                <td>{{ form.id_instrumentalness_weight }}<td>
+            </tr>
+            <tr>
+                <td>Key Weight</td>
+                <td>{{ form.id_key_weight }}</td>
+            </tr>
+            <tr>
+                <td>Liveness Weight</td>
+                <td>{{ form.id_liveness_weight }}</td>
+            </tr>
+            <tr>
+                <td>Loudness Weight</td>
+                <td>{{ form.id_loudness_weight }}</td>
+            </tr>
+            <tr>
+                <td>Mode Weight</td>
+                <td>{{ form.id_mode_weight }}</td>
+            </tr>
+            <tr>
+                <td>Speechiness Weight</td>
+                <td>{{ form.id_speechiness_weight }}</td>
+            </tr>
+            <tr>
+                <td>Tempo Weight</td>
+                <td>{{ form.id_tempo_weight }}</td>
+            </tr>
+            <tr>
+                <td>Valence Weight</td>
+                <td>{{ form.id_valence_weight }}</td>
+            </tr>
+            <!-- <input type="range" min="1" max="10" value="5" class="slider" id="acoustiness_weight"> -->
+        </table>
+    </div>
+        <br>
+    <div>
+        <button class="btn btn-primary btn-lg" type="submit">Submit</button>
+    </div>
+</div>
 </form>
 <br>
 
