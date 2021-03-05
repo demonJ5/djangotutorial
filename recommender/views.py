@@ -4,7 +4,7 @@ from django.http import Http404, JsonResponse
 from .models import *
 from .forms import *
 from django.views.decorators.http import require_POST, require_GET
-from django.db.models import F
+from django.db.models import F, Func
 import numpy as np
 
 # Container for track features
@@ -93,7 +93,7 @@ def calc_gestalt(p_features, p_cfg):
     mode_mult = p_cfg.mode_weight/total_weight
     speechiness_mult = p_cfg.speechiness_weight/total_weight
     tempo_mult = p_cfg.tempo_weight/total_weight
-    valence_mult = p_cfg.valence_mult/total_weight
+    valence_mult = p_cfg.valence_weight/total_weight
     # Calculate gestalt
     acousticness_factor = (p_features.acousticness * acousticness_mult
                             * p_cfg.ACOUSTICNESS_NORMALIZER)
@@ -193,20 +193,20 @@ def curator_post(request):
         weight_cfg.valence_weight = in_w_valen
         # Find the ID and features of the reference track in ref_title_id
         # and ref_title_features
-        ref_query = Musicdata.objects.filter(name__icontains = in_title).values()
-        ref_title_id = ref_query['id']
+        ref_query = Musicdata.objects.filter(name__icontains = in_title).values()[:1]
+        ref_title_id = ref_query[0]['id']
         ref_title_features = TrackFeatures()
-        ref_title_features.acousticness = ref_query['acousticness']
-        ref_title_features.danceability = ref_query['danceability']
-        ref_title_features.energy = ref_query['energy']
-        ref_title_features.instrumentalness = ref_query['instrumentalness']
-        ref_title_features.key = ref_query['key']
-        ref_title_features.liveness = ref_query['liveness']
-        ref_title_features.loudness = ref_query['loudness']
-        ref_title_features.mode = ref_query['mode']
-        ref_title_features.speechiness = ref_query['speechiness']
-        ref_title_features.tempo = ref_query['tempo']
-        ref_title_features.valence = ref_query['valence']
+        ref_title_features.acousticness = ref_query[0]['acousticness']
+        ref_title_features.danceability = ref_query[0]['danceability']
+        ref_title_features.energy = ref_query[0]['energy']
+        ref_title_features.instrumentalness = ref_query[0]['instrumentalness']
+        ref_title_features.key = ref_query[0]['key']
+        ref_title_features.liveness = ref_query[0]['liveness']
+        ref_title_features.loudness = ref_query[0]['loudness']
+        ref_title_features.mode = ref_query[0]['mode']
+        ref_title_features.speechiness = ref_query[0]['speechiness']
+        ref_title_features.tempo = ref_query[0]['tempo']
+        ref_title_features.valence = ref_query[0]['valence']
         # TODO #
         print('Divined reference song\'s ID %s' % ref_title_id)
         # Compute the gestalt value for the reference track and generate
@@ -218,9 +218,12 @@ def curator_post(request):
         track_query = Musicdata.objects.exclude(id = ref_title_id)
         # Can't create objects
         annotated_query = track_query.annotate(gestalt = calc_gestalt(TrackFeatures().set_features(F('acousticness'), F('danceability'), F('energy'), F('instrumentalness'), F('key'), F('liveness'), F('loudness'), F('mode'), F('speechiness'), F('tempo'), F('valence')), weight_cfg)) 
-        annotated_diffs = annotated_query.annotate(gestalt_diff = abs(ref_gestalt - F('gestalt')))
+        annotated_diffs = annotated_query.annotate(gestalt_diff = Func(ref_gestalt - F('gestalt'), function='ABS'))
         annotated_ordered_ids = annotated_diffs.order_by('gestalt_diff').values('id', 'name')[:3]
         tracks = list(annotated_ordered_ids)
+        # TODO #
+        print('Final curation list')
+        print(tracks)
         return render(request, 'recommender/curatorpage.html', {'form': form,
                 'tracks': tracks })
     else:
