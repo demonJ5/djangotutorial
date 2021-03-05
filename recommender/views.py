@@ -241,7 +241,7 @@ def curator_post(request):
         annotated_diffs = annotated_query.annotate(gestalt_diff = Func(
                 ref_gestalt - F('gestalt'), function='ABS'))
         # Find the smallest three differences; the most similar tracks
-        annotated_ordered_ids = annotated_diffs.order_by('gestalt_diff')\
+        annotated_ordered_ids = annotated_diffs.order_by('gestalt_diff') \
                 .values('id', 'name', 'gestalt')[:3]
         tracks = list(annotated_ordered_ids)
 
