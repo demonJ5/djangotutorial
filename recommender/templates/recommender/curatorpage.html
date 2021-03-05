@@ -34,6 +34,17 @@
     <div>
         Initial Song Title: {{ form.id_title }}
     </div>
+    <div>
+        {% if ref_song %}
+        <table class="table">
+            <tr><td>Curating based on the following song.</td></tr>
+            <tr><td>
+                <iframe src="https://open.spotify.com/embed/track/{{ ref_song.id }}" width="300" height="380" 
+                frameborder="0" allowtransparency="true" allow="encrypted-media"></iframe>
+            </td></tr>
+        </table>
+        {% endif %}
+    </div>
     <br>
     <div>
         <table style="float:left">
@@ -81,12 +92,14 @@
                 <td>Valence Weight</td>
                 <td>{{ form.id_valence_weight }}</td>
             </tr>
+            <tr>
+                <td><button class="btn btn-primary btn-lg" type="submit">Submit</button><td>
+            </tr>
             <!-- <input type="range" min="1" max="10" value="5" class="slider" id="acoustiness_weight"> -->
         </table>
     </div>
         <br>
     <div>
-        <button class="btn btn-primary btn-lg" type="submit">Submit</button>
     </div>
 </div>
 </form>

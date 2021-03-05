@@ -21,6 +21,8 @@ class TrackFeatures:
     tempo = 0
     valence = 0
 
+    # Required to allow initialization of the feature class with only one
+    # expression. (As in ORM queries)
     def set_features(self, p_acou, p_danc, p_en, p_inst, p_key, p_live,
                      p_loud, p_mode, p_spee, p_temp, p_vale):
         self.acousticness = p_acou
@@ -39,8 +41,9 @@ class TrackFeatures:
 
 # Container for weighted average config
 # 
-# Weights affect each feature's weight in the average. These change with
-# user configuration.
+# Weights affect each feature's importance in the average. These change with
+# user configuration and are relative. IE: If all weights are 1, it is identical
+# to all weights being 10.
 #
 # Normalizers are multipliers that bring the differing feature types to be
 # approximately around the same average. This is done by finding a multiplier
@@ -58,7 +61,7 @@ class WeightedAvgCfg:
     speechiness_weight = 5
     tempo_weight = 5
     valence_weight = 5
-    # Normalizer
+    # Normalization multipliers determined internally based on database averages
     ACOUSTICNESS_NORMALIZER = 199.237
     DANCEABILITY_NORMALIZER = 186.482
     ENERGY_NORMALIZER = 207.905
@@ -139,8 +142,10 @@ def searchform_post(request):
     # check whether it's valid:
     if form.is_valid():
         # process the data in form.cleaned_data as required
-        from_year = None if form.cleaned_data['from_year'] == None else int(form.cleaned_data['from_year'])
-        to_year = None if form.cleaned_data['to_year'] == None else int(form.cleaned_data['to_year'])
+        from_year = None if form.cleaned_data['from_year'] == None else \
+                int(form.cleaned_data['from_year'])
+        to_year = None if form.cleaned_data['to_year'] == None else \
+                int(form.cleaned_data['to_year'])
         albums = find_albums(
                 form.cleaned_data['artist'],
                 from_year,
@@ -149,7 +154,8 @@ def searchform_post(request):
             
         # Random 3 of top 10 popular albums
         albums = list(np.random.permutation(albums[:10]))[:3] 
-        return render(request, 'recommender/searchform.html', {'form': form, 'albums': albums })
+        return render(request, 'recommender/searchform.html', {'form': form, 
+                'albums': albums })
     else:
         raise Http404('Something went wrong')
 
@@ -176,8 +182,12 @@ def curator_post(request):
         in_w_speec = form.cleaned_data['id_speechiness_weight']
         in_w_tempo = form.cleaned_data['id_tempo_weight']
         in_w_valen = form.cleaned_data['id_valence_weight']
-        # TODO #
-        print('Found title %s and weights %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f' % (in_title, in_w_acous, in_w_dance, in_w_energ, in_w_instr, in_w_key, in_w_liven, in_w_loudn, in_w_mode, in_w_speec, in_w_tempo, in_w_valen))
+        # Debug printout #
+        # print('Found title %s and weights %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f' \
+        #        % (in_title, in_w_acous, in_w_dance, in_w_energ, 
+        #        in_w_instr, in_w_key, in_w_liven, in_w_loudn, in_w_mode, 
+        #        in_w_speec, in_w_tempo, in_w_valen))
+
         # Establish config for weights in weight_cfg
         weight_cfg = WeightedAvgCfg()
         weight_cfg.acousticness_weight = in_w_acous
@@ -193,39 +203,53 @@ def curator_post(request):
         weight_cfg.valence_weight = in_w_valen
         # Find the ID and features of the reference track in ref_title_id
         # and ref_title_features
-        ref_query = Musicdata.objects.filter(name__icontains = in_title).values()[:1]
-        ref_title_id = ref_query[0]['id']
+        ref_query = Musicdata.objects.filter(name__icontains = in_title)\
+                .values()[:1]
+        ref_song = ref_query[0]
+        ref_title_id = ref_song['id']
         ref_title_features = TrackFeatures()
-        ref_title_features.acousticness = ref_query[0]['acousticness']
-        ref_title_features.danceability = ref_query[0]['danceability']
-        ref_title_features.energy = ref_query[0]['energy']
-        ref_title_features.instrumentalness = ref_query[0]['instrumentalness']
-        ref_title_features.key = ref_query[0]['key']
-        ref_title_features.liveness = ref_query[0]['liveness']
-        ref_title_features.loudness = ref_query[0]['loudness']
-        ref_title_features.mode = ref_query[0]['mode']
-        ref_title_features.speechiness = ref_query[0]['speechiness']
-        ref_title_features.tempo = ref_query[0]['tempo']
-        ref_title_features.valence = ref_query[0]['valence']
-        # TODO #
-        print('Divined reference song\'s ID %s' % ref_title_id)
+        ref_title_features.acousticness = ref_song['acousticness']
+        ref_title_features.danceability = ref_song['danceability']
+        ref_title_features.energy = ref_song['energy']
+        ref_title_features.instrumentalness = ref_song['instrumentalness']
+        ref_title_features.key = ref_song['key']
+        ref_title_features.liveness = ref_song['liveness']
+        ref_title_features.loudness = ref_song['loudness']
+        ref_title_features.mode = ref_song['mode']
+        ref_title_features.speechiness = ref_song['speechiness']
+        ref_title_features.tempo = ref_song['tempo']
+        ref_title_features.valence = ref_song['valence']
+        # Debug printout #
+        # print('Divined reference song\'s ID %s' % ref_title_id)
+
         # Compute the gestalt value for the reference track and generate
         # query sorted by the difference between the reference gestalt and
         # other tracks' gestalts
         ref_gestalt = calc_gestalt(ref_title_features, weight_cfg)
-        # TODO #
-        print('Reference gestalt is %f' % ref_gestalt)
+        # Debug printout #
+        # print('Reference gestalt is %f' % ref_gestalt)
         track_query = Musicdata.objects.exclude(id = ref_title_id)
-        # Can't create objects
-        annotated_query = track_query.annotate(gestalt = calc_gestalt(TrackFeatures().set_features(F('acousticness'), F('danceability'), F('energy'), F('instrumentalness'), F('key'), F('liveness'), F('loudness'), F('mode'), F('speechiness'), F('tempo'), F('valence')), weight_cfg)) 
-        annotated_diffs = annotated_query.annotate(gestalt_diff = Func(ref_gestalt - F('gestalt'), function='ABS'))
-        annotated_ordered_ids = annotated_diffs.order_by('gestalt_diff').values('id', 'name')[:3]
+        # Annotate each entry with calculated gestalt values according to our
+        # user-defined weights
+        annotated_query = track_query.annotate(gestalt = calc_gestalt(
+                TrackFeatures().set_features(F('acousticness'), 
+                F('danceability'), F('energy'), F('instrumentalness'), F('key'),
+                F('liveness'), F('loudness'), F('mode'), F('speechiness'), 
+                F('tempo'), F('valence')), weight_cfg)) 
+        # Find the absolute difference between our reference song's gestalt and
+        # all other songs
+        annotated_diffs = annotated_query.annotate(gestalt_diff = Func(
+                ref_gestalt - F('gestalt'), function='ABS'))
+        # Find the smallest three differences; the most similar tracks
+        annotated_ordered_ids = annotated_diffs.order_by('gestalt_diff')\
+                .values('id', 'name', 'gestalt')[:3]
         tracks = list(annotated_ordered_ids)
-        # TODO #
-        print('Final curation list')
-        print(tracks)
+
+        # Debug printout #
+        # print('Final curation list')
+        # print(tracks)
         return render(request, 'recommender/curatorpage.html', {'form': form,
-                'tracks': tracks })
+                'tracks': tracks, 'ref_song': ref_song })
     else:
         raise Http404('Something went wrong in fetching the curation')
 
