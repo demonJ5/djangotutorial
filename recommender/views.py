@@ -4,13 +4,13 @@ from django.http import Http404, JsonResponse
 from .models import *
 from .forms import *
 from django.views.decorators.http import require_POST, require_GET
+from django.db.models import F
 import numpy as np
 
 # Container for track features
 class TrackFeatures:
     acousticness = 0
     danceability = 0
-    duration = 0
     energy = 0
     instrumentalness = 0
     key = 0
@@ -20,6 +20,22 @@ class TrackFeatures:
     speechiness = 0
     tempo = 0
     valence = 0
+
+    def set_features(self, p_acou, p_danc, p_en, p_inst, p_key, p_live,
+                     p_loud, p_mode, p_spee, p_temp, p_vale):
+        self.acousticness = p_acou
+        self.danceability = p_danc
+        self.energy = p_en
+        self.instrumentalness = p_inst
+        self.key = p_key
+        self.liveness = p_live
+        self.loudness = p_loud
+        self.mode = p_mode
+        self.speechiness = p_spee
+        self.tempo = p_temp
+        self.valence = p_vale
+        return self
+        
 
 # Container for weighted average config
 # 
@@ -55,11 +71,11 @@ class WeightedAvgCfg:
     TEMPO_NORMALIZER = 0.855
     VALENCE_NORMALIZER = 190.386
 
-    def weight_sum():
-        return (acousticness_weight + danceability_weight
-                + energy_weight + instrumentalness_weight + key_weight
-                + liveness_weight + loudness_weight + mode_weight
-                + speechiness_weight + tempo_weight + valence_weight)
+    def weight_sum(self):
+        return (self.acousticness_weight + self.danceability_weight
+                + self.energy_weight + self.instrumentalness_weight + self.key_weight
+                + self.liveness_weight + self.loudness_weight + self.mode_weight
+                + self.speechiness_weight + self.tempo_weight + self.valence_weight)
 
 # Calculate the gestalt values using the provided configuration
 # Gestalt is calculated as sum[feature * feature_normalizer * (feature_weight / 
@@ -145,9 +161,70 @@ def searchform_get(request):
 
 @require_POST
 def curator_post(request):
-    #form = SearchForm(request.POST)
-    form = CuratorForm()
-    return render(request, 'recommender/curatorpage.html', {'form': form})
+    form = CuratorForm(request.POST)
+    if form.is_valid():
+        # Retrieve user input
+        in_title = form.cleaned_data['id_title']
+        in_w_acous = form.cleaned_data['id_acousticness_weight']
+        in_w_dance = form.cleaned_data['id_danceability_weight']
+        in_w_energ = form.cleaned_data['id_energy_weight']
+        in_w_instr = form.cleaned_data['id_instrumentalness_weight']
+        in_w_key   = form.cleaned_data['id_key_weight']
+        in_w_liven = form.cleaned_data['id_liveness_weight']
+        in_w_loudn = form.cleaned_data['id_loudness_weight']
+        in_w_mode  = form.cleaned_data['id_mode_weight']
+        in_w_speec = form.cleaned_data['id_speechiness_weight']
+        in_w_tempo = form.cleaned_data['id_tempo_weight']
+        in_w_valen = form.cleaned_data['id_valence_weight']
+        # TODO #
+        print('Found title %s and weights %f, %f, %f, %f, %f, %f, %f, %f, %f, %f, %f' % (in_title, in_w_acous, in_w_dance, in_w_energ, in_w_instr, in_w_key, in_w_liven, in_w_loudn, in_w_mode, in_w_speec, in_w_tempo, in_w_valen))
+        # Establish config for weights in weight_cfg
+        weight_cfg = WeightedAvgCfg()
+        weight_cfg.acousticness_weight = in_w_acous
+        weight_cfg.danceability_weight = in_w_dance
+        weight_cfg.energy_weight = in_w_energ
+        weight_cfg.instrumentalness_weight = in_w_instr
+        weight_cfg.key_weight = in_w_key  
+        weight_cfg.liveness_weight = in_w_liven
+        weight_cfg.loudness_weight = in_w_loudn
+        weight_cfg.mode_weight = in_w_mode 
+        weight_cfg.speechiness_weight = in_w_speec
+        weight_cfg.tempo_weight = in_w_tempo
+        weight_cfg.valence_weight = in_w_valen
+        # Find the ID and features of the reference track in ref_title_id
+        # and ref_title_features
+        ref_query = Musicdata.objects.filter(name__icontains = in_title).values()
+        ref_title_id = ref_query['id']
+        ref_title_features = TrackFeatures()
+        ref_title_features.acousticness = ref_query['acousticness']
+        ref_title_features.danceability = ref_query['danceability']
+        ref_title_features.energy = ref_query['energy']
+        ref_title_features.instrumentalness = ref_query['instrumentalness']
+        ref_title_features.key = ref_query['key']
+        ref_title_features.liveness = ref_query['liveness']
+        ref_title_features.loudness = ref_query['loudness']
+        ref_title_features.mode = ref_query['mode']
+        ref_title_features.speechiness = ref_query['speechiness']
+        ref_title_features.tempo = ref_query['tempo']
+        ref_title_features.valence = ref_query['valence']
+        # TODO #
+        print('Divined reference song\'s ID %s' % ref_title_id)
+        # Compute the gestalt value for the reference track and generate
+        # query sorted by the difference between the reference gestalt and
+        # other tracks' gestalts
+        ref_gestalt = calc_gestalt(ref_title_features, weight_cfg)
+        # TODO #
+        print('Reference gestalt is %f' % ref_gestalt)
+        track_query = Musicdata.objects.exclude(id = ref_title_id)
+        # Can't create objects
+        annotated_query = track_query.annotate(gestalt = calc_gestalt(TrackFeatures().set_features(F('acousticness'), F('danceability'), F('energy'), F('instrumentalness'), F('key'), F('liveness'), F('loudness'), F('mode'), F('speechiness'), F('tempo'), F('valence')), weight_cfg)) 
+        annotated_diffs = annotated_query.annotate(gestalt_diff = abs(ref_gestalt - F('gestalt')))
+        annotated_ordered_ids = annotated_diffs.order_by('gestalt_diff').values('id', 'name')[:3]
+        tracks = list(annotated_ordered_ids)
+        return render(request, 'recommender/curatorpage.html', {'form': form,
+                'tracks': tracks })
+    else:
+        raise Http404('Something went wrong in fetching the curation')
 
 @require_GET
 def curator_get(request):
